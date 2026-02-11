@@ -1,0 +1,17 @@
+[Unit]
+Description=WWB Tools FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/wwbtools
+EnvironmentFile=/opt/wwbtools/.env
+Environment=DATA_DIR=/opt/wwbtools/data
+ExecStart=/opt/wwbtools/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8080
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -16,7 +16,7 @@ from bs4 import BeautifulSoup
 BIPT_MICROS_URL = "https://www.bipt.be/consumenten/radiofrequenties/professioneel-gebruik/micro-s"
 UA = "Mozilla/5.0 (compatible; BIPT-WWB-Server/1.0; +https://www.bipt.be/)"
 
-DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
+DATA_DIR = Path(os.getenv("DATA_DIR", "./data"))
 META_FILE = DATA_DIR / "meta.json"
 
 PDF_RE = re.compile(

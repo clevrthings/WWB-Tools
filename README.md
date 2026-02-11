@@ -1,116 +1,84 @@
-# BIPT → Shure Wireless Workbench Inclusion Lists
+# WWB Tools
 
-Deze applicatie genereert automatisch **Shure Wireless Workbench inclusion lists (`.ils`)**
-op basis van de **officiële BIPT-zonedocumenten** voor draadloze microfoons in België.
+Deze website combineert:
 
-De app is ontworpen om:
-- continu up-to-date te blijven,
-- eenvoudig te gebruiken te zijn voor audio professionals,
-- en stabiel te draaien op een **Synology NAS via Docker**.
+1. `BIPT -> WWB Inclusion Lists` (automatische `.ils`)
+2. `Frequency Exclusion Builder` (image -> `.csv/.txt/.json/.fxl` via OpenAI)
 
----
+## Routes
 
-## ✨ Features
+- `/` hoofdpagina met downloadbare `.ils` bestanden
+- `/exclusion-builder/` uploadtool voor exclusions
+- `/debug` admin/debug pagina (Basic Auth)
 
-- 📥 Automatische download van BIPT zone-PDF’s
-- 🧠 Slimme detectie van nieuwe kwartalen
-- 🗂️ Generatie van Shure WWB `.ils` inclusion lists
-- 🟢 Per provincie: **alle bruikbare frequenties** (vergund + vrijgesteld)
-- 🟣 Eén globale lijst **“Vrije frequenties”**
-- 🕒 Houdt **huidig + volgend kwartaal** beschikbaar
-- 🗑️ Verwijdert automatisch verouderde kwartaalbestanden
-- 🌐 Simpele webpagina om bestanden te downloaden
-- 📊 Debug/admin pagina met bezoekers- en downloadstatistieken
-- 🔐 Adminpagina beveiligd via environment variables
-- 🐳 Klaar voor Docker & Synology Container Manager
-
----
-
-## 🌍 Webinterface
-
-### Publieke pagina
-- Toont beschikbare `.ils` bestanden
-- Bevat een korte handleiding voor import in WWB
-- Link naar officiële Shure Wireless Workbench download
-
-### Debug / admin pagina
-- URL: `/debug`
-- Beveiligd met Basic Auth
-- Toont statistieken en status
-- Laat manueel een update-check uitvoeren
-
----
-
-## 📘 Importeren in Shure Wireless Workbench
-
-1. Open **Frequency Coordination**
-2. Klik rechts onderaan op **Spectrum**
-3. Klik op het **⚙️ gear-icoon**
-4. Bij **User Groups**:
-   - vink **“Account for user groups when calculating frequencies”** aan
-5. Klik rechts naast **List** op **Manage**
-6. Kies **Custom**
-7. Klik op het **⚙️ gear-icoon**
-8. Kies **Import Groups**
-9. Selecteer het gedownloade `.ils` bestand
-10. Klik op **Save**
-
-De inclusion groups verschijnen daarna onder **Custom inclusion lists**.
-
----
-
-## 🧪 Lokaal testen (zonder Docker)
+## Lokaal draaien
 
 ```bash
-git clone https://github.com/<jouw-username>/bipt-wwb-server.git
-cd bipt-wwb-server
-
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-export DATA_DIR=./data
-export DEBUG_USER=admin
-export DEBUG_PASS=test123
-export TZ=Europe/Brussels
+cp .env.example .env
+# vul OPENAI_API_KEY in
 
-uvicorn app.main:app --reload --port 8080
+uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
----
+## Draaien als systemd service (zonder Docker)
 
-## 🐳 Docker / Synology NAS
+Voorbeeld deploymentpad: `/opt/wwbtools`
 
 ```bash
-git clone https://github.com/<jouw-username>/bipt-wwb-server.git
-cd bipt-wwb-server
+sudo mkdir -p /opt/wwbtools
+sudo rsync -a --delete ./ /opt/wwbtools/
+cd /opt/wwbtools
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 cp .env.example .env
-docker compose up -d --build
 ```
 
----
+Kopieer service file:
 
-## ⚙️ Environment variables
+```bash
+sudo cp /opt/wwbtools/wwbtools.service /etc/systemd/system/wwbtools.service
+```
 
-Zie `.env.example` voor alle opties.
+Pas in `/etc/systemd/system/wwbtools.service` eventueel `User`, `Group` en paden aan, daarna:
 
----
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now wwbtools
+sudo systemctl status wwbtools
+```
 
-## 🔐 Security
+## Hosting op `wwb.clevrthings.com`
 
-- Adminpagina is niet publiek
-- Credentials via environment variables
-- Gebruik sterke wachtwoorden of IP-beperkingen
+1. DNS:
+- `A` record `wwb.clevrthings.com` -> jouw server IP
 
----
+2. Reverse proxy:
+- `https://wwb.clevrthings.com` -> `http://127.0.0.1:8080`
 
-## 📜 Licentie
+3. TLS:
+- activeer Let's Encrypt certificaat op `wwb.clevrthings.com`
 
-MIT License
+Nginx voorbeeld:
 
----
+```nginx
+server {
+    listen 443 ssl;
+    server_name wwb.clevrthings.com;
 
-## 🧭 Disclaimer
+    ssl_certificate /etc/letsencrypt/live/wwb.clevrthings.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/wwb.clevrthings.com/privkey.pem;
 
-Deze tool vervangt geen officiële BIPT-vergunningen.
-De gebruiker blijft verantwoordelijk voor correct en legaal frequentiegebruik.
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```

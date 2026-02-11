@@ -9,9 +9,9 @@ from apscheduler.triggers.cron import CronTrigger
 
 from .storage import init_db, inc_counter, inc_download, get_stats, mark_unique
 from .bipt_wwb import nightly_check_and_update, list_available_files
+from .exclusion_builder import router as exclusion_builder_router
 
 from pathlib import Path
-from fastapi.templating import Jinja2Templates
 
 DEBUG_USER = os.getenv("DEBUG_USER", "admin")
 DEBUG_PASS = os.getenv("DEBUG_PASS", "change-me")
@@ -20,9 +20,10 @@ CHECK_MINUTE = int(os.getenv("CHECK_MINUTE", "15"))
 LANG = os.getenv("LANG_CODE", "NL")
 LIST_NAME = os.getenv("LIST_NAME", "Belgium (BIPT zones)")
 
-DATA_DIR = os.getenv("DATA_DIR", "/data")
+DATA_DIR = os.getenv("DATA_DIR", "./data")
 
-app = FastAPI(title="BIPT → WWB Inclusion List")
+app = FastAPI(title="WWB Tools")
+app.include_router(exclusion_builder_router)
 
 BASE_DIR = Path(__file__).resolve().parent  # .../app
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
@@ -60,7 +61,7 @@ async def startup():
 async def count_visits(request: Request, call_next):
     # Count only "human" pages (skip static download responses below)
     path = request.url.path
-    if path == "/" or path == "/debug":
+    if path in {"/", "/debug", "/exclusion-builder/"}:
         inc_counter("pageviews", 1)
         # Unique visitors (hash of ip+ua) - no raw IP stored
         ip = request.client.host if request.client else "unknown"
@@ -100,5 +101,5 @@ async def debug(request: Request):
 @app.post("/debug/run-check")
 async def run_check(request: Request):
     _check_basic_auth(request)
-    changed = nightly_check_and_update(lang=LANG, list_name=LIST_NAME)
+    nightly_check_and_update(lang=LANG, list_name=LIST_NAME)
     return RedirectResponse(url="/debug", status_code=303)
