@@ -1,84 +1,67 @@
 # WWB Tools
 
-Deze website combineert:
+## Live Website
 
-1. `BIPT -> WWB Inclusion Lists` (automatische `.ils`)
-2. `Frequency Exclusion Builder` (image -> `.csv/.txt/.json/.fxl` via OpenAI)
+**https://wwb.clevrthings.com**
 
-## Routes
+WWB Tools is a website for wireless audio users who work with **Shure Wireless Workbench (WWB)**.
+It provides two practical tools:
 
-- `/` hoofdpagina met downloadbare `.ils` bestanden
-- `/exclusion-builder/` uploadtool voor exclusions
-- `/debug` admin/debug pagina (Basic Auth)
+1. **BIPT Inclusion Lists**: download ready-to-import `.ils` files.
+2. **Frequency Exclusion Builder**: upload an image and generate exclusion files (`.csv`, `.txt`, `.json`, `.fxl`).
 
-## Lokaal draaien
+## Tool 1: BIPT Inclusion Lists
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+On the homepage, you can download the latest WWB inclusion list files based on official BIPT zone documents.
 
-cp .env.example .env
-# vul OPENAI_API_KEY in
+### What this is for
 
-uvicorn app.main:app --host 0.0.0.0 --port 8080
-```
+- Quickly load valid frequency ranges into WWB.
+- Reduce manual data entry.
+- Keep your coordination workflow up to date.
 
-## Draaien als systemd service (zonder Docker)
+### How to use
 
-Voorbeeld deploymentpad: `/opt/wwbtools`
+1. Open `https://wwb.clevrthings.com`.
+2. In **BIPT Inclusion Lists**, click the `.ils` file you want.
+3. Open **Frequency Coordination** in WWB.
+4. Go to **Spectrum**.
+5. Enable `Account for user groups when calculating frequencies`.
+6. Go to **List > Manage > Custom > Import Groups**.
+7. Select the downloaded `.ils` file.
 
-```bash
-sudo mkdir -p /opt/wwbtools
-sudo rsync -a --delete ./ /opt/wwbtools/
-cd /opt/wwbtools
+## Tool 2: Frequency Exclusion Builder
 
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-```
+Open the builder at:
+`https://wwb.clevrthings.com/exclusion-builder/`
 
-Kopieer service file:
+Upload a photo or screenshot (for example, of frequency notes, venue sheets, or coordination docs).  
+The tool extracts frequencies and ranges, then generates files you can use in your WWB workflow.
 
-```bash
-sudo cp /opt/wwbtools/wwbtools.service /etc/systemd/system/wwbtools.service
-```
+### What this is for
 
-Pas in `/etc/systemd/system/wwbtools.service` eventueel `User`, `Group` en paden aan, daarna:
+- Convert visual frequency lists into usable files.
+- Generate WWB exclusion data faster.
+- Export in multiple formats for different workflows.
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now wwbtools
-sudo systemctl status wwbtools
-```
+### How to use
 
-## Hosting op `wwb.clevrthings.com`
+1. Open the Exclusion Builder page.
+2. Upload an image.
+3. Optionally add extra instructions in the prompt box.
+4. Click **Process**.
+5. Download the generated files you need.
 
-1. DNS:
-- `A` record `wwb.clevrthings.com` -> jouw server IP
+## Output Files
 
-2. Reverse proxy:
-- `https://wwb.clevrthings.com` -> `http://127.0.0.1:8080`
+The Exclusion Builder can generate:
 
-3. TLS:
-- activeer Let's Encrypt certificaat op `wwb.clevrthings.com`
+- `.csv`: easy to review in spreadsheet tools.
+- `.txt`: plain text list.
+- `.json`: structured model output.
+- `.fxl`: exclusion format for WWB workflows.
 
-Nginx voorbeeld:
+## Notes
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name wwb.clevrthings.com;
-
-    ssl_certificate /etc/letsencrypt/live/wwb.clevrthings.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/wwb.clevrthings.com/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+- The BIPT list is based on publicly available BIPT source documents.
+- Always verify final coordination choices in your real-world RF context.
