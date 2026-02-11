@@ -594,46 +594,64 @@ async def exclusion_builder_process(
     image: UploadFile = File(...),
     prompt: str = Form(default=""),
 ) -> HTMLResponse:
-    image_bytes = await image.read()
-    if not image_bytes:
-        raise HTTPException(status_code=400, detail="Invalid image")
-
-    mime_type = (
-        image.content_type
-        or _mime_from_filename(image.filename)
-        or "application/octet-stream"
-    )
-
     try:
-        if CONVERT_TO_JPEG:
-            image_bytes, mime_type = _ensure_jpeg(image_bytes, mime_type, image.filename)
+        image_bytes = await image.read()
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Invalid image")
 
-        resp_json = _call_openai(image_bytes, mime_type, prompt)
-        text = _extract_text_from_response(resp_json)
-        payload = _parse_json_payload(text)
-        freqs, ranges = _normalize_frequencies(payload)
-        job_id = str(int(time.time() * 1000))
-        _write_outputs(job_id, freqs, ranges, payload)
-    except Exception as exc:
-        return HTMLResponse(
-            _build_error_page("Processing error: {}".format(str(exc))), status_code=500
+        mime_type = (
+            image.content_type
+            or _mime_from_filename(image.filename)
+            or "application/octet-stream"
         )
 
-    entries: list[str] = []
-    for freq in freqs:
-        entries.append("        <li>{:.3f} MHz</li>".format(freq))
-    for start, end in ranges:
-        entries.append("        <li>{:.3f} - {:.3f} MHz</li>".format(start, end))
-    if not entries:
-        entries.append("        <li>No frequencies found.</li>")
+        try:
+            if CONVERT_TO_JPEG:
+                image_bytes, mime_type = _ensure_jpeg(
+                    image_bytes, mime_type, image.filename
+                )
 
-    body = RESULT_PAGE
-    body = body.replace("__ENTRIES__", "\n".join(entries))
-    body = body.replace("__CSV__", f"/exclusion-builder/download?job={job_id}&format=csv")
-    body = body.replace("__TXT__", f"/exclusion-builder/download?job={job_id}&format=txt")
-    body = body.replace("__JSON__", f"/exclusion-builder/download?job={job_id}&format=json")
-    body = body.replace("__FXL__", f"/exclusion-builder/download?job={job_id}&format=fxl")
-    return HTMLResponse(body)
+            resp_json = _call_openai(image_bytes, mime_type, prompt)
+            text = _extract_text_from_response(resp_json)
+            payload = _parse_json_payload(text)
+            freqs, ranges = _normalize_frequencies(payload)
+            job_id = str(int(time.time() * 1000))
+            _write_outputs(job_id, freqs, ranges, payload)
+        except Exception as exc:
+            return HTMLResponse(
+                _build_error_page("Processing error: {}".format(str(exc))),
+                status_code=500,
+            )
+
+        entries: list[str] = []
+        for freq in freqs:
+            entries.append("        <li>{:.3f} MHz</li>".format(freq))
+        for start, end in ranges:
+            entries.append("        <li>{:.3f} - {:.3f} MHz</li>".format(start, end))
+        if not entries:
+            entries.append("        <li>No frequencies found.</li>")
+
+        body = RESULT_PAGE
+        body = body.replace("__ENTRIES__", "\n".join(entries))
+        body = body.replace(
+            "__CSV__", f"/exclusion-builder/download?job={job_id}&format=csv"
+        )
+        body = body.replace(
+            "__TXT__", f"/exclusion-builder/download?job={job_id}&format=txt"
+        )
+        body = body.replace(
+            "__JSON__", f"/exclusion-builder/download?job={job_id}&format=json"
+        )
+        body = body.replace(
+            "__FXL__", f"/exclusion-builder/download?job={job_id}&format=fxl"
+        )
+        return HTMLResponse(body)
+    finally:
+        # Explicitly close Starlette's upload handle so any spooled temp file is removed.
+        try:
+            await image.close()
+        except Exception:
+            pass
 
 
 @router.get("/download")
